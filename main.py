@@ -51,7 +51,7 @@ def read_html_file(html_file_path):
 
 def extract_songs_and_artists(content):
     soup = BeautifulSoup(content, 'html.parser')
-    class_lst = ["cell cell-title", "cell cell-title marquee"]
+    class_lst = ["cell cell-title", "cell cell-title marquee","cell cell-title purple-label"]
     song_divs = soup.find_all("div", class_=class_lst)
     artist_divs = soup.find_all("div", {"class": "cell cell-artist"})
     songs = [div.find("span").text for div in song_divs]
@@ -149,3 +149,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
