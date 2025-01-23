@@ -1,5 +1,6 @@
 from bs4 import BeautifulSoup
 import configparser
+import argparse
 import logging
 from tqdm import tqdm
 import spotipy
@@ -9,6 +10,15 @@ from spotipy.oauth2 import SpotifyOAuth
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 logger = logging.getLogger()
 
+def create_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+    description="Script to migrate Anghami playlists to Spotify.")
+
+    # Anghami configuration
+    parser.add_argument('--anghami_html', type=str, help="Path to the HTML file for Anghami.")
+    parser.add_argument('--spotify_playlist', type=str, help="Name of the generated playlist.")
+    parser.add_argument('--extract_only', action = "store_true" ,help="Spotify client secret.")
+    return parser
 
 # Function to load the details from the configuration file
 def load_details():
@@ -23,7 +33,14 @@ def load_details():
     save_to_text = config.getboolean('General', 'save_to_text')
     txt_save_path = config.get('General', 'txt_save_path')
     txt_song_artist_separator = config.get('General', 'txt_song_artist_separator')
-    return html_file_path, client_id, client_secret, redirect_url, username, spotify_playlist_name, save_to_text, txt_save_path, txt_song_artist_separator
+
+    #override any argument which was specified via the command line
+    parser = create_parser()
+    args = parser.parse_args()
+    html_file_path = args.anghami_html if args.anghami_html else html_file_path
+    spotify_playlist_name = args.spotify_playlist if args.spotify_playlist else spotify_playlist_name
+    extract_only = args.extract_only
+    return html_file_path, client_id, client_secret, redirect_url, username, spotify_playlist_name, save_to_text, txt_save_path, txt_song_artist_separator,extract_only
 
 
 def read_html_file(html_file_path):
@@ -83,8 +100,10 @@ def search_and_add_tracks(sp, playlist_id, songs, artists, username):
 
 def main():
     # Load details from configuration file
-    html_file_path, client_id, client_secret, redirect_url, username, spotify_playlist_name, save_to_text, txt_save_path, txt_song_artist_separator = load_details()
-
+    html_file_path, client_id, client_secret, redirect_url, \
+    username, spotify_playlist_name, save_to_text, \
+    txt_save_path, txt_song_artist_separator, extract_only = load_details()
+    
     # Read the HTML file
     content = read_html_file(html_file_path)
 
@@ -101,6 +120,11 @@ def main():
     for song, artist in zip(songs, artists):
         logger.info(f"{song} {txt_song_artist_separator} {artist}")
 
+    # terminate program if only anghami extraction is requested.
+    if extract_only:
+        logger.info("Extraction only mode. Terminating program...")
+        return
+    
     # Save the playlist to a text file
     if save_to_text:
         save_playlist_to_text(songs, artists, txt_save_path, txt_song_artist_separator)
