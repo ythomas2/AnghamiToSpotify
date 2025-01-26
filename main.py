@@ -21,26 +21,31 @@ def create_parser() -> argparse.ArgumentParser:
     return parser
 
 # Function to load the details from the configuration file
-def load_details():
+def load_details() -> dict:
     config = configparser.ConfigParser()
     config.read('config.ini')
-    html_file_path = config.get('Anghami', 'html_file_path')
-    client_id = config.get('Spotify', 'client_id')
-    client_secret = config.get('Spotify', 'client_secret')
-    redirect_url = config.get('Spotify', 'redirect_url')
-    username = config.get('Spotify', 'username')
-    spotify_playlist_name = config.get('Spotify', 'playlist_name')
-    save_to_text = config.getboolean('General', 'save_to_text')
-    txt_save_path = config.get('General', 'txt_save_path')
-    txt_song_artist_separator = config.get('General', 'txt_song_artist_separator')
+    details = {
+    "html_file_path" : config.get('Anghami', 'html_file_path'),
+    "client_id" : config.get('Spotify', 'client_id'),
+    "client_secret" : config.get('Spotify', 'client_secret'),
+    "redirect_url" : config.get('Spotify', 'redirect_url'),
+    "username" : config.get('Spotify', 'username'),
+    "spotify_playlist_name" : config.get('Spotify', 'playlist_name'),
+    "save_to_text" : config.getboolean('General', 'save_to_text'),
+    "txt_save_path" : config.get('General', 'txt_save_path'),
+    "txt_song_artist_separator" : config.get('General', 'txt_song_artist_separator'),
+    }
 
     #override any argument which was specified via the command line
     parser = create_parser()
     args = parser.parse_args()
-    html_file_path = args.anghami_html if args.anghami_html else html_file_path
-    spotify_playlist_name = args.spotify_playlist if args.spotify_playlist else spotify_playlist_name
-    extract_only = args.extract_only
-    return html_file_path, client_id, client_secret, redirect_url, username, spotify_playlist_name, save_to_text, txt_save_path, txt_song_artist_separator,extract_only
+    if args.anghami_html:
+        details['html_file_path'] = args.anghami_html
+    if args.spotify_playlist:
+        details['spotify_playlist_name'] = args.spotify_playlist 
+    details['extract_only'] = args.extract_only
+    
+    return details
 
 
 def read_html_file(html_file_path):
@@ -100,15 +105,13 @@ def search_and_add_tracks(sp, playlist_id, songs, artists, username):
 
 def main():
     # Load details from configuration file
-    html_file_path, client_id, client_secret, redirect_url, \
-    username, spotify_playlist_name, save_to_text, \
-    txt_save_path, txt_song_artist_separator, extract_only = load_details()
-    
+    details = load_details()
+
     # Read the HTML file
-    content = read_html_file(html_file_path)
+    content = read_html_file(details['html_file_path'])
 
     # Extract songs and artists from the HTML
-    songs, artists = extract_songs_and_artists(content)
+    songs, artists = extract_songs_and_artists_body(content)
 
     # Check if the number of songs matches the number of artists
     if len(songs) != len(artists):
@@ -118,25 +121,25 @@ def main():
     # Print the playlist details
     logger.info("\nPlaylist Details:")
     for song, artist in zip(songs, artists):
-        logger.info(f"{song} {txt_song_artist_separator} {artist}")
+        logger.info(f"{song} {details['txt_song_artist_separator']} {artist}")
 
     # terminate program if only anghami extraction is requested.
-    if extract_only:
+    if details['extract_only']:
         logger.info("Extraction only mode. Terminating program...")
         return
     
     # Save the playlist to a text file
-    if save_to_text:
-        save_playlist_to_text(songs, artists, txt_save_path, txt_song_artist_separator)
+    if details['save_to_text']:
+        save_playlist_to_text(songs, artists, details['txt_save_path'], details['txt_song_artist_separator'])
         logger.info("Playlist saved to text file.")
 
     # Authenticate and create a new playlist on Spotify
-    sp = authenticate_spotify(client_id, client_secret, redirect_url, username)
-    playlist_id = create_spotify_playlist(sp, username, spotify_playlist_name)
+    sp = authenticate_spotify(details['client_id'], details['client_secret'], details['redirect_url'], details['username'])
+    playlist_id = create_spotify_playlist(sp, details['username'], details['spotify_playlist_name'])
 
     # Search and add tracks to the Spotify playlist
     logger.info("Importing playlist to Spotify...")
-    not_found = search_and_add_tracks(sp, playlist_id, songs, artists, username)
+    not_found = search_and_add_tracks(sp, playlist_id, songs, artists, details['username'])
 
     logger.info("Playlist import completed.")
 
@@ -149,4 +152,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
