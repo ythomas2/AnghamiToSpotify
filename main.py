@@ -1,10 +1,11 @@
-from bs4 import BeautifulSoup
 import configparser
 import argparse
 import logging
-from tqdm import tqdm
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
+from thefuzz import fuzz
+from bs4 import BeautifulSoup
+from tqdm import tqdm
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
@@ -85,6 +86,13 @@ def create_spotify_playlist(sp, username, spotify_playlist_name):
                                        description="Imported from Anghami")
     return playlist['id']
 
+def check_search_quality(anghamiSongName,anghamiArtistName,spotifySongName,spotifyArtistName):
+    anghamiString = f"{anghamiSongName} {anghamiArtistName}"
+    spotifyString = f"{spotifySongName} {spotifyArtistName}"
+    ratio = fuzz.token_sort_ratio(anghamiString,spotifyString)
+    # this threshold was chosen based on empirical testing. perhaps it could be further optimized?
+    if ratio < 85:
+        logger.warning(f"Possible query problem. Requested {anghamiString.strip()}. Best match on Spotify {spotifyString}")
 
 def search_and_add_tracks(sp, playlist_id, songs, artists, username):
     not_found = []
@@ -92,7 +100,9 @@ def search_and_add_tracks(sp, playlist_id, songs, artists, username):
         try:
             res = sp.search(q=f"{song} {artist}", type='track', limit=1)
             if len(res['tracks']['items']) > 0:
-                uri = res['tracks']['items'][0]['uri']
+                best_match = res['tracks']['items'][0]
+                check_search_quality(song,artist,best_match['name']," ".join(artist['name'] for artist in best_match['artists']))
+                uri = best_match['uri']
                 sp.user_playlist_add_tracks(user=username, playlist_id=playlist_id, tracks=[uri])
             else:
                 not_found.append(f"{song} {artist}")
